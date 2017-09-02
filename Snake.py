@@ -57,14 +57,24 @@ while True:
             x += 1
         elif dir == WEST:
             x -= 1
+
+        if x < 0:
+            x = window_size[0] - 1
+        elif x == window_size[0]:
+            x = 0
+        elif y < 0:
+            y = window_size[1] - 1
+        elif y == window_size[1]:
+            y = 0
+
         coor = (x, y)
-        if x < 0 or x >= window_size[0] or y < 0 or y >= window_size[1] or coor in tail:
+        if coor in tail:
             break
 
         last = tail[-1]
         for i in range(len(tail) - 1, 0, -1):
             tail[i] = tail[i-1]
-        tail[0] = (x, y)
+        tail[0] = coor
 
         if coor in apples:
             tail.append(last)
