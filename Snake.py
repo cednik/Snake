@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from random import randrange as rand
+from collections import deque
 import pygame as pg
 
 raster = 10
@@ -11,7 +12,8 @@ pg.display.set_caption('Snake')
 
 MOVE_EVENT = pg.USEREVENT + 1
 
-pg.time.set_timer(MOVE_EVENT, 250)
+move_period = 250
+pg.time.set_timer(MOVE_EVENT, move_period)
 
 NORTH = 1
 SOUTH = 2
@@ -24,7 +26,7 @@ RED = pg.Color('red')
 
 x = int(window_size[0] / 2)
 y = int(window_size[1] / 2)
-dir = EAST
+dirs = deque([EAST])
 tail = [(x, y)]
 apples = []
 
@@ -38,24 +40,26 @@ while True:
     if e.type == pg.QUIT:
         break
     elif e.type == pg.KEYDOWN:
-        if e.key == pg.K_UP and dir != SOUTH:
-            dir = NORTH
-        if e.key == pg.K_DOWN and dir != NORTH:
-            dir = SOUTH
-        if e.key == pg.K_LEFT and dir != EAST:
-            dir = WEST
-        if e.key == pg.K_RIGHT and dir != WEST:
-            dir = EAST
-        if e.key == pg.K_ESCAPE:
+        if e.key == pg.K_UP and dirs[-1] != SOUTH:
+            dirs.append(NORTH)
+        elif e.key == pg.K_DOWN and dirs[-1] != NORTH:
+            dirs.append(SOUTH)
+        elif e.key == pg.K_LEFT and dirs[-1] != EAST:
+            dirs.append(WEST)
+        elif e.key == pg.K_RIGHT and dirs[-1] != WEST:
+            dirs.append(EAST)
+        elif e.key == pg.K_ESCAPE:
             break
     elif e.type == MOVE_EVENT:
-        if dir == NORTH:
+        if len(dirs) > 1:
+            dirs.popleft()
+        if dirs[0] == NORTH:
             y -= 1
-        elif dir == SOUTH:
+        elif dirs[0] == SOUTH:
             y += 1
-        elif dir == EAST:
+        elif dirs[0] == EAST:
             x += 1
-        elif dir == WEST:
+        elif dirs[0] == WEST:
             x -= 1
 
         if x < 0:
