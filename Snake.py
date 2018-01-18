@@ -3,18 +3,28 @@ import pygame
 
 pygame.init()
 
-screen = pygame.display.set_mode((320, 240))
+WIDTH = 800
+HEIGHT = 600
 
-white = pygame.color.Color('white')
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
-pygame.draw.circle(screen, (0, 255, 0), (160, 120), 60, 1)
-pygame.draw.circle(screen, white, (160, 120), 30)
+CIRCLE_SIZE = 10
+x = -CIRCLE_SIZE // 2
 
-pygame.display.flip()
+MOVE_EVENT = pygame.USEREVENT + 1
+pygame.time.set_timer(MOVE_EVENT, 1000//100)
+
 
 while True:
     event = pygame.event.wait()
-    if event.type == pygame.QUIT:
+    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
         break
+    elif event.type == MOVE_EVENT:
+        screen.fill((0, 0, 0))
+        pygame.draw.circle(screen, (255, 255, 255), (x, HEIGHT // 2), CIRCLE_SIZE)
+        pygame.display.flip()
+        x += 1
+        if x > (WIDTH + CIRCLE_SIZE // 2):
+            x = -CIRCLE_SIZE // 2
 
 pygame.quit()
