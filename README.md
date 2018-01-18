@@ -1,2 +1,2 @@
 # Snake
-Simpla Snake game, written in Python, as a lactures materials
+Simple Snake game, written in Python using pygame, as a lactures materials
