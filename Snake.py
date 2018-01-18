@@ -10,9 +10,6 @@ HEIGHT = 600
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
-#print(pygame.font.get_fonts())
-#text = pygame.font.SysFont('arial', 50, True)
-
 CIRCLE_SIZE = 10
 
 background_color = pygame.Color('black')
@@ -51,8 +48,6 @@ while True:
             dx = -1
             dy = 0
     elif event.type == MOVE_EVENT:
-        #text_surf = text.render(str(t), True, (0, 255, 0), (0, 0, 0))
-        #screen.blit(text_surf, (20, 20))
         x += dx
         y += dy
         if x < CIRCLE_SIZE or x >= (WIDTH - CIRCLE_SIZE) or y < CIRCLE_SIZE or y >= (HEIGHT - CIRCLE_SIZE):
