@@ -5,27 +5,27 @@ from math import sqrt
 
 pygame.init()
 
-WIDTH = 800
-HEIGHT = 600
+raster = 20
+window_size = (25, 25)
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+circle_size = raster // 2 - 1
 
-CIRCLE_SIZE = 10
+screen = pygame.display.set_mode((window_size[0] * raster, window_size[1] * raster))
 
 background_color = pygame.Color('black')
 my_color = pygame.Color('green')
 item_color = pygame.Color('white')
 
 MOVE_EVENT = pygame.USEREVENT + 1
-pygame.time.set_timer(MOVE_EVENT, 1000//100)
+pygame.time.set_timer(MOVE_EVENT, 1000//4)
 
-x = WIDTH // 2
-y = HEIGHT // 2
+x = int(window_size[0] / 2)
+y = int(window_size[1] / 2)
 dx = 0
 dy = 0
 x_item = x
 y_item = y
-score = -1
+score = 0
 
 while True:
     
@@ -50,17 +50,17 @@ while True:
     elif event.type == MOVE_EVENT:
         x += dx
         y += dy
-        if x < CIRCLE_SIZE or x >= (WIDTH - CIRCLE_SIZE) or y < CIRCLE_SIZE or y >= (HEIGHT - CIRCLE_SIZE):
+        if x < 0 or x >= window_size[0] or y < 0 or y >= window_size[1]:
             break
-        if sqrt((x - x_item) ** 2 + (y - y_item) ** 2) < 2 * CIRCLE_SIZE:
+        if x == x_item and y == y_item:
             score += 1
             x_item = None
         if x_item is None:
-            x_item = randint(CIRCLE_SIZE, WIDTH - CIRCLE_SIZE)
-            y_item = randint(CIRCLE_SIZE, HEIGHT - CIRCLE_SIZE)
+            x_item = randint(0, window_size[0] - 1)
+            y_item = randint(0, window_size[1] - 1)
     screen.fill(background_color)
-    pygame.draw.circle(screen, my_color, (x, y), CIRCLE_SIZE)
-    pygame.draw.circle(screen, item_color, (x_item, y_item), CIRCLE_SIZE)
+    pygame.draw.circle(screen, item_color, (x_item * raster + raster // 2, y_item * raster + raster // 2), circle_size)
+    pygame.draw.circle(screen, my_color, (x * raster + raster // 2, y * raster + raster // 2), circle_size)
     pygame.display.flip()
 
 pygame.quit()
