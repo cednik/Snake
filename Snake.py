@@ -2,6 +2,7 @@
 import pygame
 from random import randint
 from math import sqrt
+from collections import deque
 
 pygame.init()
 
@@ -26,7 +27,7 @@ RIGHT = 4
 
 x = int(window_size[0] / 2)
 y = int(window_size[1] / 2)
-course = RIGHT
+course = deque([RIGHT])
 tail = [(x, y)]
 x_item = x
 y_item = y
@@ -45,23 +46,25 @@ while True:
     elif event.type == pygame.KEYDOWN:
         if event.key == pygame.K_ESCAPE:
             break
-        elif event.key == pygame.K_DOWN:
-            course = DOWN
-        elif event.key == pygame.K_UP:
-            course = UP
-        elif event.key == pygame.K_RIGHT:
-            course = RIGHT
-        elif event.key == pygame.K_LEFT:
-            course = LEFT
+        elif event.key == pygame.K_DOWN and course[-1] != UP:
+            course.append(DOWN)
+        elif event.key == pygame.K_UP and course[-1] != DOWN:
+            course.append(UP)
+        elif event.key == pygame.K_RIGHT and course[-1] != LEFT:
+            course.append(RIGHT)
+        elif event.key == pygame.K_LEFT and course[-1] != RIGHT:
+            course.append(LEFT)
     
     elif event.type == MOVE_EVENT:
-        if course == UP:
+        if len(course) > 1:
+            course.popleft()
+        if course[0] == UP:
             y -= 1
-        elif course == DOWN:
+        elif course[0] == DOWN:
             y += 1
-        elif course == LEFT:
+        elif course[0] == LEFT:
             x -= 1
-        elif course == RIGHT:
+        elif course[0] == RIGHT:
             x += 1
         else:
             print('Invalid direction!')
