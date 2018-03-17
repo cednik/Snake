@@ -46,18 +46,20 @@ class Snake:
     LEFT  = 2
     RIGHT = 4
     
-    def __init__(self, playground, start, course, color, keys):
+    def __init__(self, playground, start, course, length, color, keys, started = False):
         self.playground = playground
-        self.playground[start[1]][start[0]] = self
-        self.tail = [start]
+        x, y = start
+        dx, dy = ((0, 1), (1, 0), (0, -1), (-1, 0))[course-1]
+        self.tail = list((x + dx * i, y + dy * i) for i in range(length))
         self.course = deque([course])
         self.color = color
         self.keys = keys
         self.score = 0
+        self.started = started
         self.alive = True
 
     def control(self, key):
-        if not self.alive:
+        if not (self.alive and self.started):
             return
         if key == self.keys[1] and self.course[-1] != Snake.UP:
             self.course.append(Snake.DOWN)
@@ -69,7 +71,7 @@ class Snake:
             self.course.append(Snake.LEFT)
 
     def move(self):
-        if not self.alive:
+        if not (self.alive and self.started):
             return
         x, y = self.tail[0]
         if len(self.course) > 1:
@@ -86,39 +88,48 @@ class Snake:
         if x < 0 or y < 0 or y >= len(self.playground) or x >= len(self.playground[y]) or isinstance(self.playground[y][x], (Snake, Wall)):
             self.alive = False
             for x, y in self.tail:
-                self.playground[y][x] = None
+                try:
+                    self.playground[y][x] = None
+                except IndexError:
+                    pass
             return
         last = self.tail[-1]
         for i in range(len(self.tail) - 1, 0, -1):
             self.tail[i] = self.tail[i-1]
         self.tail[0] = coor
-        if isinstance(self.playground[coor[1]][coor[0]], Apple):
+        if isinstance(self.playground[y][x], Apple):
             self.tail.append(last)
             self.score += 1
-            self.playground[coor[1]][coor[0]].eat()
+            self.playground[y][x].eat()
         else:
-            self.playground[last[1]][last[0]] = None
-        self.playground[coor[1]][coor[0]] = self
+            if last[1] >= 0 and last[1] < len(self.playground) and last[0] >= 0 and last[0] < len(self.playground[last[1]]):
+                self.playground[last[1]][last[0]] = None
+        self.playground[y][x] = self
 
     def draw(self, surface, x, y):
-        if not self.alive:
-            return
         pygame.draw.rect(surface, self.color, pygame.Rect(x, y, raster, raster))
+
+    def start(self):
+        if self.started:
+            return
+        self.started = True
+        x, y = self.tail[0]
+        self.playground[y][x] = self
 
     def __bool__(self):
         return self.alive
 
+    def __len__(self):
+        return len(self.tail)
+
 playground = []
 
 def load_level(name, playground):
+    start_course = {'U': Snake.UP, 'D': Snake.DOWN, 'L': Snake.LEFT, 'R': Snake.RIGHT}
+    start = None
     del playground[:]
     name = str(name) + '.lvl'
-    items = {
-        ' ': lambda: None,
-        '#': Wall
-        }
     with open(os.path.join('levels', name)) as f:
-        y = 0
         for line in f:
             if line[-1] == '\n':
                 line = line[:-1]
@@ -126,10 +137,21 @@ def load_level(name, playground):
                 continue
             row = []
             for square in line:
-                row.append(None if not square in items else items[square]())
+                if square == ' ':
+                    item = None
+                elif square == '#':
+                    item = Wall()
+                elif square in start_course:
+                    start = ((len(row), len(playground)), start_course[square])
+                row.append(item)
             playground.append(row)
+    if start == None:
+        y = len(playground) - 1
+        x = len(playground[y]) // 2
+        start = ((x, y), start_course['U'])
+    return start
 
-load_level(1, playground)
+start_point, start_dir = load_level(1, playground)
 
 circle_size = raster // 2 - 1
 
@@ -142,21 +164,21 @@ background_color = pygame.Color('black')
 MOVE_EVENT = pygame.USEREVENT + 1
 pygame.time.set_timer(MOVE_EVENT, 1000//4)
 
-snakes = 3
-space = 3
-y = len(playground) // 2
-x0 = len(playground[y]) // 2
-start = [(space * x + x0 - space * snakes // 2, y) for x in range(snakes)]
+snakes_count = 3
+
 keys = ((pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d),
         (pygame.K_i, pygame.K_k, pygame.K_j, pygame.K_l),
         (pygame.K_KP8, pygame.K_KP5, pygame.K_KP4, pygame.K_KP6))
 colors = (pygame.color.Color('yellow'),
           pygame.color.Color('cyan'),
           pygame.color.Color('magenta'))
-snakes = [Snake(playground, start[i], Snake.UP, color = colors[i], keys = keys[i]) for i in range(snakes)]
+snakes = [Snake(playground, start_point, start_dir, 4, color = colors[i], keys = keys[i]) for i in range(snakes_count)]
 
-apple = Apple(playground)
+start_space = 2
 
+started = 0
+moves = 0
+next_start = 0
 redraw = True
 
 while True:
@@ -176,7 +198,18 @@ while True:
             snake.move()
         if not any(snakes):
             break
+        if moves == next_start:
+            if started < snakes_count:
+                snakes[started].start()
+                next_start += len(snakes[started])
+                started += 1
+                if started != snakes_count:
+                    next_start += start_space
+            elif started == snakes_count:
+                playground[start_point[1]][start_point[0]] = Wall()
+                Apple(playground)
         pygame.display.set_caption('Snake' + 16 * ' ' + 'Score: {}'.format(', '.join('{:3}'.format(snake.score) for snake in snakes)))
+        moves += 1
         redraw = True
 
     if redraw:
