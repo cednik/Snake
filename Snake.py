@@ -4,10 +4,9 @@ from random import randint
 from math import sqrt
 from collections import deque
 import os
+from Communication import tcp
 
 raster = 20
-
-pygame.init()
 
 class Wall:
     color = pygame.color.Color('blue')
@@ -50,24 +49,23 @@ class Snake:
     LEFT  = 2
     RIGHT = 4
     
-    def __init__(self, playground, start, course, length, target_score, color, keys):
+    def __init__(self, playground, start, course, length, target_score, color):
         self.playground = playground
         self.color = color
-        self.keys = keys
         self.score = 0
         self.reinit(start, course, length, target_score)
         self.alive = True
 
-    def control(self, key):
+    def control(self, course):
         if (not (self.alive and self.started)) or self.finished:
             return
-        if key == self.keys[1] and self.course[-1] != Snake.UP:
+        if course == Snake.DOWN and self.course[-1] != Snake.UP:
             self.course.append(Snake.DOWN)
-        elif key == self.keys[0] and self.course[-1] != Snake.DOWN:
+        elif course == Snake.UP and self.course[-1] != Snake.DOWN:
             self.course.append(Snake.UP)
-        elif key == self.keys[3] and self.course[-1] != Snake.LEFT:
+        elif course == Snake.RIGHT and self.course[-1] != Snake.LEFT:
             self.course.append(Snake.RIGHT)
-        elif key == self.keys[2] and self.course[-1] != Snake.RIGHT:
+        elif course == Snake.LEFT and self.course[-1] != Snake.RIGHT:
             self.course.append(Snake.LEFT)
 
     def move(self):
@@ -141,8 +139,6 @@ class Snake:
     def __len__(self):
         return len(self.tail)
 
-playground = []
-
 def load_level(name, playground):
     start_course = {'U': Snake.UP, 'D': Snake.DOWN, 'L': Snake.LEFT, 'R': Snake.RIGHT}
     start = None
@@ -176,107 +172,136 @@ def load_level(name, playground):
         finish = (len(playground[0]) // 2, 0)
     return start, finish
 
-levels_count = 30
-level = 1
-random_level = False
 
-(start_point, start_dir), finish_point = load_level(level, playground)
+def main(argv):
 
-h = len(playground)
-w = len(max(playground, key = len))
-screen = pygame.display.set_mode((w * raster, h * raster))
+    playground = []
 
-background_color = pygame.Color('black')
+    levels_count = 30
+    level = 1
+    random_level = False
 
-MOVE_EVENT = pygame.USEREVENT + 1
-pygame.time.set_timer(MOVE_EVENT, 1000//8)
+    snakes_count = 3
+    target_score = 8
+    start_length = 4
+    start_space = 2
 
-snakes_count = 3
-target_score = 5
-start_length = 4
-start_space = 2
+    server = tcp.Server('', 1234, timeout = 0, client_timeout = 0, encoding = 'utf8', decoding = None)
+    clients = []
+    print('Waiting for players...')
+    while len(clients) < snakes_count:
+        client = server.accept()
+        if client != None:
+            clients.append(client)
+            print('{} connected.'.format(client.address))
+    print('Starting game')
 
-keys = ((pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d),
-        (pygame.K_i, pygame.K_k, pygame.K_j, pygame.K_l),
-        (pygame.K_KP8, pygame.K_KP5, pygame.K_KP4, pygame.K_KP6))
-colors = (pygame.color.Color('yellow'),
-          pygame.color.Color('cyan'),
-          pygame.color.Color('magenta'))
-snakes = [Snake(playground, start_point, start_dir, start_length, target_score, color = colors[i], keys = keys[i]) for i in range(snakes_count)]
+    pygame.init()
 
-started = 0
-moves = 0
-next_start = 0
-redraw = True
+    (start_point, start_dir), finish_point = load_level(level, playground)
 
-while True:
+    h = len(playground)
+    w = len(max(playground, key = len))
+    screen = pygame.display.set_mode((w * raster, h * raster))
+
+    background_color = pygame.Color('black')
+
+    MOVE_EVENT = pygame.USEREVENT + 1
+    pygame.time.set_timer(MOVE_EVENT, 1000//8)
+    NET_EVENT = MOVE_EVENT + 1
+    pygame.time.set_timer(NET_EVENT, 10)
     
-    event = pygame.event.wait()
-    if event.type == pygame.QUIT:
-        break
-    
-    elif event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_ESCAPE:
+    colors = (pygame.color.Color('yellow'),
+              pygame.color.Color('cyan'),
+              pygame.color.Color('magenta'))
+    snakes = [Snake(playground, start_point, start_dir, start_length, target_score, color = colors[i]) for i in range(snakes_count)]
+
+    started = 0
+    moves = 0
+    next_start = 0
+    redraw = True
+
+    exit_flag = 0
+
+    while True:
+        
+        event = pygame.event.wait()
+        if event.type == pygame.QUIT:
             break
-        elif event.key == pygame.K_SPACE:
-            pygame.event.post(pygame.event.Event(MOVE_EVENT))
-        else:
+        
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                break
+            elif event.key == pygame.K_SPACE:
+                pygame.event.post(pygame.event.Event(MOVE_EVENT))
+
+        elif event.type == NET_EVENT:
+            for i in range(snakes_count):
+                data = clients[i].read(1)
+                if data:
+                    snakes[i].control({b'w': Snake.UP, b's': Snake.DOWN, b'a': Snake.LEFT, b'd': Snake.RIGHT}.get(data, 0))
+        
+        elif event.type == MOVE_EVENT:
             for snake in snakes:
-                snake.control(event.key)
-    
-    elif event.type == MOVE_EVENT:
-        for snake in snakes:
-            snake.move()
-        if not any(snakes):
-            break
-        if moves == next_start:
-            if started < snakes_count:
-                while not snakes[started].alive:
-                    started += 1
-                    if started == snakes_count:
-                        next_start = moves + 1
-                        break
-                else:
-                    snakes[started].start()
-                    next_start += len(snakes[started])
-                    started += 1
-                    if started != snakes_count:
-                        next_start += start_space
-            elif started == snakes_count:
-                playground[start_point[1]][start_point[0]] = Wall()
-                Apple(playground)
-        if any(map(lambda snake: snake.score >= snake.target_score, snakes)) and not isinstance(playground[finish_point[1]][finish_point[0]], Snake):
-            playground[finish_point[1]][finish_point[0]] = Finish()
-            if all(map(lambda snake: (not snake.alive) or ((not snake.started) and snake.finished), snakes)):
-                if random_level:
-                    level = randint(1, levels_count)
-                else:
-                    if level == levels_count:
-                        random_level = True
-                    else:                    
-                        level += 1
-                (start_point, start_dir), finish_point = load_level(level, playground)
-                started = 0
-                moves = -1
-                next_start = 0
-                for snake in snakes:
-                    snake.reinit(start_point, start_dir, start_length, target_score)
-                snakes.sort(key = lambda snake: snake.score)
-        pygame.display.set_caption('Snake' + 16 * ' ' + 'Score: {}'.format(', '.join('{:3}'.format(snake.score) for snake in snakes)))
-        moves += 1
-        redraw = True
+                snake.move()
+            if not any(snakes):
+                exit_flag = 1
+                break
+            if moves == next_start:
+                if started < snakes_count:
+                    while not snakes[started].alive:
+                        started += 1
+                        if started == snakes_count:
+                            next_start = moves + 1
+                            break
+                    else:
+                        snakes[started].start()
+                        next_start += len(snakes[started])
+                        started += 1
+                        if started != snakes_count:
+                            next_start += start_space
+                elif started == snakes_count:
+                    playground[start_point[1]][start_point[0]] = Wall()
+                    for i in range(snakes_count-1):
+                        Apple(playground)
+            if any(map(lambda snake: snake.score >= snake.target_score, snakes)) and not isinstance(playground[finish_point[1]][finish_point[0]], Snake):
+                playground[finish_point[1]][finish_point[0]] = Finish()
+                if all(map(lambda snake: (not snake.alive) or ((not snake.started) and snake.finished), snakes)):
+                    if random_level:
+                        level = randint(1, levels_count)
+                    else:
+                        if level == levels_count:
+                            random_level = True
+                        else:                    
+                            level += 1
+                    (start_point, start_dir), finish_point = load_level(level, playground)
+                    started = 0
+                    moves = -1
+                    next_start = 0
+                    for snake in snakes:
+                        snake.reinit(start_point, start_dir, start_length, target_score)
+                    snakes.sort(key = lambda snake: snake.score)
+            pygame.display.set_caption('Snake' + 16 * ' ' + 'Score: {}'.format(', '.join('{:3}'.format(snake.score) for snake in snakes)))
+            moves += 1
+            redraw = True
 
-    if redraw:
-        redraw = False
-        screen.fill(background_color)
-        y = 0
-        for line in playground:
-            x = 0
-            for square in line:
-                if square != None:
-                    square.draw(screen, x, y)
-                x += raster
-            y += raster
-        pygame.display.flip()
+        if redraw:
+            redraw = False
+            screen.fill(background_color)
+            y = 0
+            for line in playground:
+                x = 0
+                for square in line:
+                    if square != None:
+                        square.draw(screen, x, y)
+                    x += raster
+                y += raster
+            pygame.display.flip()
 
-pygame.quit()
+    pygame.quit()
+    return exit_flag
+
+if __name__ == '__main__':
+    from sys import argv
+    while main(argv) == 1:
+        pass
