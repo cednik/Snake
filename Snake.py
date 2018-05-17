@@ -14,6 +14,9 @@ class Wall:
     def draw(self, surface, x, y):
         pygame.draw.rect(surface, Wall.color, pygame.Rect(x, y, raster, raster))
 
+    def net_msg(self):
+        return '#'
+
 class Finish:
     def draw(self, surface, x, y):
         pass
@@ -43,16 +46,20 @@ class Apple:
     def draw(self, surface, x, y):
         pygame.draw.ellipse(surface, self.color, pygame.Rect(x, y, raster, raster))
 
+    def net_msg(self):
+        return '*'
+
 class Snake:
     UP    = 1
     DOWN  = 3
     LEFT  = 2
     RIGHT = 4
     
-    def __init__(self, playground, start, course, length, target_score, color):
+    def __init__(self, playground, start, course, length, target_score, color, name):
         self.playground = playground
         self.color = color
         self.score = 0
+        self.name = name
         self.reinit(start, course, length, target_score)
         self.alive = True
 
@@ -116,6 +123,9 @@ class Snake:
 
     def draw(self, surface, x, y):
         pygame.draw.rect(surface, self.color, pygame.Rect(x, y, raster, raster))
+
+    def net_msg(self):
+        return self.name
 
     def reinit(self, start, course, length, target_score):
         x, y = start
@@ -181,7 +191,7 @@ def main(argv):
     level = 1
     random_level = False
 
-    snakes_count = 3
+    snakes_count = 1
     target_score = 8
     start_length = 4
     start_space = 2
@@ -214,7 +224,7 @@ def main(argv):
     colors = (pygame.color.Color('yellow'),
               pygame.color.Color('cyan'),
               pygame.color.Color('magenta'))
-    snakes = [Snake(playground, start_point, start_dir, start_length, target_score, color = colors[i]) for i in range(snakes_count)]
+    snakes = [Snake(playground, start_point, start_dir, start_length, target_score, color = colors[i], name = chr(ord('a') + i)) for i in range(snakes_count)]
 
     started = 0
     moves = 0
@@ -222,6 +232,8 @@ def main(argv):
     redraw = True
 
     exit_flag = 0
+
+    key_map = {b'w': Snake.UP, b's': Snake.DOWN, b'a': Snake.LEFT, b'd': Snake.RIGHT}
 
     while True:
         
@@ -239,7 +251,10 @@ def main(argv):
             for i in range(snakes_count):
                 data = clients[i].read(1)
                 if data:
-                    snakes[i].control({b'w': Snake.UP, b's': Snake.DOWN, b'a': Snake.LEFT, b'd': Snake.RIGHT}.get(data, 0))
+                    if data in key_map:
+                        snakes[i].control(key_map[data])
+                    else:
+                        print('received "{}"'.format(data))
         
         elif event.type == MOVE_EVENT:
             for snake in snakes:
@@ -262,7 +277,7 @@ def main(argv):
                             next_start += start_space
                 elif started == snakes_count:
                     playground[start_point[1]][start_point[0]] = Wall()
-                    for i in range(snakes_count-1):
+                    for i in range(max(snakes_count-1, 1)):
                         Apple(playground)
             if any(map(lambda snake: snake.score >= snake.target_score, snakes)) and not isinstance(playground[finish_point[1]][finish_point[0]], Snake):
                 playground[finish_point[1]][finish_point[0]] = Finish()
@@ -289,14 +304,22 @@ def main(argv):
             redraw = False
             screen.fill(background_color)
             y = 0
+            msg = ''
             for line in playground:
                 x = 0
                 for square in line:
                     if square != None:
                         square.draw(screen, x, y)
+                        msg += square.net_msg()
+                    else:
+                        msg += ' '
                     x += raster
                 y += raster
+                msg += '\n'
+            msg += '!\n'
             pygame.display.flip()
+            for client in clients:
+                client.write(msg)
 
     pygame.quit()
     return exit_flag
